@@ -6,6 +6,7 @@ A spinning chore wheel for the kids. Pick who's spinning, tap the wheel, and it 
 
 - Big, tappable wheel with a pointer, clicky sound and confetti when it lands
 - Takes turns: after each spin it switches to the next kid automatically (tap a name to pick someone else)
+- A list of 24 chores with 8 on the wheel at a time (6, 8, 10 or 12 slices); each picked chore is swapped out for the one that hasn't come up the longest, so everything rotates through
 - **I did it!** marks the chore done and earns a star; star counts show on each kid's button
 - **Swap my chore** re-spins for the same kid, once per turn (the swapped chore is final)
 - Today list of who got what and what's finished (clears itself each new day)

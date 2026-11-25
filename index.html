@@ -40,6 +40,10 @@ h1 span { color:var(--sun); }
 .kid { min-height:44px; padding:8px 18px; border-radius:99px; border:2px solid rgba(255,255,255,.3); background:transparent; color:#fff; font-weight:800; font-size:1.05rem; }
 .kid.on { background:var(--sun); border-color:var(--sun); color:var(--ink); }
 .kid .st { display:inline-block; margin-left:8px; padding:1px 8px; border-radius:99px; background:rgba(255,255,255,.16); font-size:.9rem; }
+.slot { min-width:52px; min-height:44px; padding:0 12px; border-radius:12px; border:2px solid var(--line); background:#fff; color:var(--ink); font-weight:800; font-size:1rem; }
+.slot.on { background:var(--s6); border-color:var(--s6); color:#fff; }
+.item .sw.off { background:transparent !important; border:2px solid #c9bfa9; }
+.item .rest { color:var(--ink-soft); font-size:.8rem; font-weight:700; white-space:nowrap; }
 .kid.on .st { background:rgba(27,20,70,.14); }
 .swapnote { color:var(--ink-soft); font-weight:700; font-size:.9rem; margin-top:10px; }
 .stars { font-size:1.6rem; letter-spacing:2px; margin-top:4px; overflow-wrap:anywhere; }
@@ -148,7 +152,11 @@ h1 span { color:var(--sun); }
     </div>
 
     <div class="sec">
-      <div class="sub">Chores on the wheel</div>
+      <div class="sub">Slices on the wheel</div>
+      <div class="row" id="slotBtns" style="justify-content:flex-start;margin-bottom:12px"></div>
+      <div class="sub">A picked chore comes back after</div>
+      <div class="row" id="restBtns" style="justify-content:flex-start;margin-bottom:12px"></div>
+      <div class="sub" id="choreSub">All chores</div>
       <div class="list" id="choreList"></div>
       <form class="add" id="addChore"><input id="newChore" placeholder="Add a chore" maxlength="40" autocomplete="off"><button class="btn">Add</button></form>
     </div>
@@ -169,7 +177,7 @@ h1 span { color:var(--sun); }
       <button class="btn reset" id="resetAll">Reset to starter chores</button>
       <button class="btn reset" id="resetStars">Reset stars</button>
     </div>
-    <p class="note">Saved on this device only. The starter chores and names are examples, so change them to fit your house.</p>
+    <p class="note">Saved on this device only. Chores 9 to 24 are starter ideas, so edit them to fit your house.</p>
   </div>
 </div>
 <canvas class="confetti" id="confetti"></canvas>
@@ -180,7 +188,10 @@ const KEY = 'chore-wheel-v1';
 const COLORS = ['#ff5d73','#ffa630','#ffd23f','#3ecf8e','#2ec4f1','#7b6cff','#f06bd0','#9be15d'];
 const STARTER = {
   kids: ['Allie', 'Andy'],
-  chores: ['Gather trash from rooms','Wipe the table','Take recycling/trash to curb','Tidy your room','Fill cat water & feeders','Sweep the kitchen','Fill dog water & feeder','Clean the bathroom'],
+  chores: ['Gather trash from rooms','Wipe the table','Take recycling/trash to curb','Tidy your room','Fill cat water & feeders','Sweep the kitchen','Fill dog water & feeder','Clean the bathroom',
+    'Scoop the litter box','Pick up dog poop in yard','Brush the dog','Vacuum the living room','Dust the living room','Wipe kitchen counters','Clean bathroom mirror','Make your bed',
+    'Pick up toys & shoes','Wipe door handles','Clean out the car','Wipe the fridge door','Sweep the front porch','Line up shoes by door','Wipe the microwave','Mop the kitchen floor'],
+  wheel: null, slots: 8, rest: 3, used: {},
   noRepeat: true, sound: true, log: [], day: '', stars: {}
 };
 const $ = id => document.getElementById(id);
@@ -191,20 +202,46 @@ let S;
 try { S = JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { S = null; }
 if (!S || !Array.isArray(S.chores)) S = JSON.parse(JSON.stringify(STARTER));
 if (!S.stars || typeof S.stars !== 'object') S.stars = {};
+if (!S.used || typeof S.used !== 'object') S.used = {};
+if (![6, 8, 10, 12].includes(S.slots)) S.slots = 8;
+if (![1, 2, 3, 5, 7].includes(S.rest)) S.rest = 3;
 if (S.day !== today()) { S.log = []; S.day = today(); }
 let kid = S.kids.includes(S.next) ? S.next : (S.kids[0] || '');
 let rot = 0, spinning = false, current = null;
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 
+/* The wheel shows S.slots chores at a time from the full list. When one is picked,
+   its slice is refilled from the bench. A picked chore rests S.rest days before it can
+   come back; if every bench chore is still resting, the one picked longest ago returns. */
+function nextBench() {
+  const bench = S.chores.filter(c => !S.wheel.includes(c));
+  if (!bench.length) return null;
+  const age = c => S.used[c] || 0, cutoff = Date.now() - S.rest * 864e5;
+  let pool = bench.filter(c => age(c) <= cutoff);
+  if (!pool.length) { const min = Math.min(...bench.map(age)); pool = bench.filter(c => age(c) === min); }
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+function syncWheel() {
+  S.wheel = (Array.isArray(S.wheel) ? S.wheel : []).filter((c, i, a) => S.chores.includes(c) && a.indexOf(c) === i).slice(0, S.slots);
+  while (S.wheel.length < Math.min(S.slots, S.chores.length)) S.wheel.push(nextBench());
+}
+function refill(chore) {
+  S.used[chore] = Date.now();
+  const i = S.wheel.indexOf(chore), nx = nextBench();
+  if (i < 0 || !nx) return;
+  S.wheel[i] = nx; save(); drawWheel();
+}
+syncWheel();
+
 /* ---------- wheel ---------- */
 function drawWheel() {
-  const w = $('wheel'), n = S.chores.length;
+  const w = $('wheel'), n = S.wheel.length;
   if (!n) { w.innerHTML = '<circle r="196" fill="#3a2f80"/><text y="70" text-anchor="middle" fill="#fff" font-size="20" font-weight="800">Add chores in ⚙</text>'; return; }
   const seg = 360 / n, R = 192;
   const base = n <= 6 ? 21 : n <= 10 ? 17 : n <= 14 ? 14 : 12;
   const room = R - 14 - 50; // from rim to just outside the hub
   let g = '<circle r="200" fill="#fff"/>';
-  S.chores.forEach((c, i) => {
+  S.wheel.forEach((c, i) => {
     const a0 = (i * seg - 90) * Math.PI / 180, a1 = ((i + 1) * seg - 90) * Math.PI / 180;
     const col = COLORS[i % COLORS.length === 0 && i === n - 1 && n > 1 ? 1 : i % COLORS.length];
     const large = seg > 180 ? 1 : 0;
@@ -245,25 +282,27 @@ function tick() {
   } catch (e) {}
 }
 function pick(avoid) {
-  const n = S.chores.length;
-  let choices = S.chores.map((_, i) => i);
+  const n = S.wheel.length;
+  let choices = S.wheel.map((_, i) => i);
   if (S.noRepeat && n > 1) {
     const last = S.log.find(l => l.kid === kid);
-    if (last) choices = choices.filter(i => S.chores[i] !== last.chore);
+    if (last) choices = choices.filter(i => S.wheel[i] !== last.chore);
   }
-  if (avoid && choices.length > 1) choices = choices.filter(i => S.chores[i] !== avoid);
-  if (!choices.length) choices = S.chores.map((_, i) => i);
+  if (avoid && choices.length > 1) choices = choices.filter(i => S.wheel[i] !== avoid);
+  if (!choices.length) choices = S.wheel.map((_, i) => i);
   const r = new Uint32Array(1); crypto.getRandomValues(r);
   return choices[r[0] % choices.length];
 }
 function spin(swap) {
   swap = swap === true ? swap : null;
   if (spinning) return;
-  if (!S.chores.length) { openParent(); return; }
+  if (!S.wheel.length) { openParent(); return; }
+  if (!swap && current && !current.refilled) { current.refilled = true; refill(current.chore); }
+  if (swap && current) current.refilled = true; // a swapped-out chore stays on the wheel
   if (ac && ac.state === 'suspended') ac.resume();
   spinning = true; $('spin').disabled = true; $('result').hidden = true;
   $('hint').textContent = 'Spinning...';
-  const n = S.chores.length, seg = 360 / n, i = pick(swap && current ? current.chore : null);
+  const n = S.wheel.length, seg = 360 / n, i = pick(swap && current ? current.chore : null);
   const jitter = (Math.random() - .5) * seg * .7;
   const target = 360 - (i + .5) * seg + jitter;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -276,7 +315,7 @@ function spin(swap) {
 }
 function land(i, swapped) {
   spinning = false; $('spin').disabled = false;
-  current = { kid, chore: S.chores[i], time: new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}), done: false, swapped };
+  current = { kid, chore: S.wheel[i], time: new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}), done: false, swapped };
   S.log.unshift(current); S.log = S.log.slice(0, 30); save();
   $('resLab').textContent = kid ? `${kid}, your chore is` : 'Your chore is';
   $('resChore').textContent = current.chore;
@@ -300,6 +339,7 @@ $('againBtn').addEventListener('click', () => {
 });
 $('doneBtn').addEventListener('click', () => {
   if (!current || current.done) return; current.done = true;
+  if (!current.refilled) { const c = current; c.refilled = true; setTimeout(() => refill(c.chore), 900); }
   const k = current.kid || 'Star'; S.stars[k] = (S.stars[k] || 0) + 1; save(); drawLog(); drawKids();
   const n = S.stars[k];
   $('resBtns').hidden = true; $('swapNote').hidden = true;
@@ -333,11 +373,19 @@ function confetti(count) {
 /* ---------- parent panel ---------- */
 function drawLists() {
   $('kidList').innerHTML = S.kids.map((k, i) => `<div class="item"><input data-t="kids" data-i="${i}" value="${esc(k)}" maxlength="24" aria-label="Kid name"><button class="x" data-t="kids" data-i="${i}" aria-label="Remove ${esc(k)}">×</button></div>`).join('');
-  $('choreList').innerHTML = S.chores.map((c, i) => `<div class="item"><span class="sw" style="background:${COLORS[i % COLORS.length]}"></span><input data-t="chores" data-i="${i}" value="${esc(c)}" maxlength="40" aria-label="Chore"><button class="x" data-t="chores" data-i="${i}" aria-label="Remove ${esc(c)}">×</button></div>`).join('');
+  $('slotBtns').innerHTML = [6, 8, 10, 12].map(n => `<button class="slot${S.slots === n ? ' on' : ''}" data-n="${n}">${n}</button>`).join('');
+  $('restBtns').innerHTML = [1, 2, 3, 5, 7].map(n => `<button class="slot${S.rest === n ? ' on' : ''}" data-r="${n}">${n} day${n > 1 ? 's' : ''}</button>`).join('');
+  $('choreSub').textContent = `All chores (${S.chores.length}). Filled dot = on the wheel now. A picked chore leaves the wheel and a rested one takes its place.`;
+  const cutoff = Date.now() - S.rest * 864e5;
+  $('choreList').innerHTML = S.chores.map((c, i) => { const w = S.wheel.indexOf(c), u = S.used[c] || 0;
+    const rest = w < 0 && u > cutoff ? `<span class="rest">back in ${Math.ceil((u - cutoff) / 864e5)}d</span>` : '';
+    return `<div class="item"><span class="sw${w < 0 ? ' off' : ''}" style="background:${w < 0 ? 'transparent' : COLORS[w % COLORS.length]}"></span><input data-t="chores" data-i="${i}" value="${esc(c)}" maxlength="40" aria-label="Chore">${rest}<button class="x" data-t="chores" data-i="${i}" aria-label="Remove ${esc(c)}">×</button></div>`; }).join('');
   $('starList').innerHTML = S.kids.length ? S.kids.map(k => `<div class="item"><span style="flex:1;font-weight:800;padding:8px 0">${esc(k)}</span><span style="font-weight:800;padding-right:10px">⭐ ${S.stars[k] || 0}</span></div>`).join('') : '<div class="sub">Add a kid first.</div>';
   $('noRepeat').checked = !!S.noRepeat; $('sound').checked = !!S.sound;
 }
-function refresh() { save(); drawWheel(); drawKids(); }
+function refresh() { syncWheel(); save(); drawWheel(); drawKids(); }
+$('slotBtns').addEventListener('click', e => { const b = e.target.closest('.slot'); if (!b) return; S.slots = +b.dataset.n; refresh(); drawLists(); });
+$('restBtns').addEventListener('click', e => { const b = e.target.closest('.slot'); if (!b) return; S.rest = +b.dataset.r; save(); drawLists(); });
 function openParent() { drawLists(); $('veil').hidden = false; }
 $('openParent').addEventListener('click', openParent);
 $('closeParent').addEventListener('click', () => { $('veil').hidden = true; refresh(); });
@@ -345,14 +393,19 @@ $('veil').addEventListener('click', e => { if (e.target === $('veil')) { $('veil
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('veil').hidden) { $('veil').hidden = true; refresh(); } });
 document.querySelector('.panel').addEventListener('input', e => {
   const t = e.target; if (!t.dataset.t) return;
-  const v = t.value.trim(); if (v) { S[t.dataset.t][+t.dataset.i] = v; refresh(); }
+  const v = t.value.trim(), list = S[t.dataset.t], i = +t.dataset.i, old = list[i];
+  if (!v || v === old || list.includes(v)) return;
+  list[i] = v;
+  if (t.dataset.t === 'chores') { const w = S.wheel.indexOf(old); if (w >= 0) S.wheel[w] = v; if (S.used[old]) { S.used[v] = S.used[old]; delete S.used[old]; } }
+  else { if (S.stars[old]) { S.stars[v] = S.stars[old]; delete S.stars[old]; } if (S.next === old) S.next = v; if (kid === old) kid = v; }
+  refresh();
 });
 document.querySelector('.panel').addEventListener('click', e => {
   const b = e.target.closest('.x'); if (!b) return;
   S[b.dataset.t].splice(+b.dataset.i, 1); refresh(); drawLists();
 });
 $('addKid').addEventListener('submit', e => { e.preventDefault(); const v = $('newKid').value.trim(); if (v && !S.kids.includes(v)) { S.kids.push(v); $('newKid').value = ''; refresh(); drawLists(); } });
-$('addChore').addEventListener('submit', e => { e.preventDefault(); const v = $('newChore').value.trim(); if (v) { S.chores.push(v); $('newChore').value = ''; refresh(); drawLists(); } });
+$('addChore').addEventListener('submit', e => { e.preventDefault(); const v = $('newChore').value.trim(); if (v && !S.chores.includes(v)) { S.chores.push(v); $('newChore').value = ''; refresh(); drawLists(); } });
 $('noRepeat').addEventListener('change', e => { S.noRepeat = e.target.checked; save(); });
 $('sound').addEventListener('change', e => { S.sound = e.target.checked; save(); });
 $('clearLog').addEventListener('click', () => { S.log = []; current = null; $('result').hidden = true; save(); drawLog(); });
@@ -364,7 +417,7 @@ function confirmBtn(id, fn) {
   });
 }
 confirmBtn('resetAll', () => {
-  S = Object.assign(JSON.parse(JSON.stringify(STARTER)), { day: today(), stars: S.stars }); current = null; $('result').hidden = true;
+  S = Object.assign(JSON.parse(JSON.stringify(STARTER)), { day: today(), stars: S.stars }); syncWheel(); current = null; $('result').hidden = true;
   refresh(); drawLists(); drawLog();
 });
 confirmBtn('resetStars', () => { S.stars = {}; save(); drawKids(); drawLists(); });
