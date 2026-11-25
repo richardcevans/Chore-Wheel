@@ -1,6 +1,6 @@
 // Chore Wheel service worker: caches the app so it works offline.
 // Bump CACHE when you change the app so phones pick up the new version.
-const CACHE = 'chore-wheel-v3';
+const CACHE = 'chore-wheel-v4';
 const ASSETS = ['./', 'index.html', 'manifest.json', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
