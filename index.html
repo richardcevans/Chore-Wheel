@@ -39,6 +39,10 @@ h1 span { color:var(--sun); }
 .kids { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
 .kid { min-height:44px; padding:8px 18px; border-radius:99px; border:2px solid rgba(255,255,255,.3); background:transparent; color:#fff; font-weight:800; font-size:1.05rem; }
 .kid.on { background:var(--sun); border-color:var(--sun); color:var(--ink); }
+.kid .st { display:inline-block; margin-left:8px; padding:1px 8px; border-radius:99px; background:rgba(255,255,255,.16); font-size:.9rem; }
+.kid.on .st { background:rgba(27,20,70,.14); }
+.swapnote { color:var(--ink-soft); font-weight:700; font-size:.9rem; margin-top:10px; }
+.stars { font-size:1.6rem; letter-spacing:2px; margin-top:4px; overflow-wrap:anywhere; }
 
 .stage { position:relative; width:min(100%,440px); aspect-ratio:1; }
 .stage svg.wheel { width:100%; height:100%; display:block; transition:transform 4.6s cubic-bezier(.12,.62,.08,1); filter:drop-shadow(0 18px 34px rgba(0,0,0,.45)); }
@@ -122,7 +126,9 @@ h1 span { color:var(--sun); }
       <button class="btn go" id="doneBtn">I did it!</button>
       <button class="btn alt" id="againBtn">Swap my chore</button>
     </div>
-    <div class="done-msg" id="doneMsg" hidden>Nice work! ⭐</div>
+    <div class="swapnote" id="swapNote" hidden>You used your swap, so this one's yours!</div>
+    <div class="done-msg" id="doneMsg" hidden></div>
+    <div class="stars" id="starRow" hidden aria-hidden="true"></div>
   </section>
 
   <section class="log">
@@ -151,12 +157,17 @@ h1 span { color:var(--sun); }
       <label class="toggle"><input type="checkbox" id="noRepeat"> Don't give the same kid the same chore twice in a row</label>
     </div>
     <div class="sec">
+      <div class="sub">Stars</div>
+      <div class="list" id="starList"></div>
+    </div>
+    <div class="sec">
       <label class="toggle"><input type="checkbox" id="sound"> Clicky spin sound</label>
     </div>
 
     <div class="sec row" style="justify-content:flex-start">
       <button class="btn reset" id="clearLog">Clear today's list</button>
       <button class="btn reset" id="resetAll">Reset to starter chores</button>
+      <button class="btn reset" id="resetStars">Reset stars</button>
     </div>
     <p class="note">Saved on this device only. The starter chores and names are examples, so change them to fit your house.</p>
   </div>
@@ -170,7 +181,7 @@ const COLORS = ['#ff5d73','#ffa630','#ffd23f','#3ecf8e','#2ec4f1','#7b6cff','#f0
 const STARTER = {
   kids: ['Allie', 'Andy'],
   chores: ['Gather trash from rooms','Wipe the table','Take recycling/trash to curb','Tidy your room','Fill cat water & feeders','Sweep the kitchen','Fill dog water & feeder','Clean the bathroom'],
-  noRepeat: true, sound: true, log: [], day: ''
+  noRepeat: true, sound: true, log: [], day: '', stars: {}
 };
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -179,6 +190,7 @@ const today = () => new Date().toDateString();
 let S;
 try { S = JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { S = null; }
 if (!S || !Array.isArray(S.chores)) S = JSON.parse(JSON.stringify(STARTER));
+if (!S.stars || typeof S.stars !== 'object') S.stars = {};
 if (S.day !== today()) { S.log = []; S.day = today(); }
 let kid = S.kids.includes(S.next) ? S.next : (S.kids[0] || '');
 let rot = 0, spinning = false, current = null;
@@ -213,7 +225,7 @@ function drawWheel() {
 function drawKids() {
   $('whoBox').hidden = S.kids.length === 0;
   if (!S.kids.includes(kid)) kid = S.kids[0] || '';
-  $('kids').innerHTML = S.kids.map(k => `<button class="kid${k === kid ? ' on' : ''}" data-k="${esc(k)}">${esc(k)}</button>`).join('');
+  $('kids').innerHTML = S.kids.map(k => `<button class="kid${k === kid ? ' on' : ''}" data-k="${esc(k)}">${esc(k)}<span class="st">⭐ ${S.stars[k] || 0}</span></button>`).join('');
 }
 $('kids').addEventListener('click', e => {
   const b = e.target.closest('.kid'); if (!b || spinning) return;
@@ -232,23 +244,26 @@ function tick() {
     o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime + .04);
   } catch (e) {}
 }
-function pick() {
+function pick(avoid) {
   const n = S.chores.length;
   let choices = S.chores.map((_, i) => i);
   if (S.noRepeat && n > 1) {
     const last = S.log.find(l => l.kid === kid);
     if (last) choices = choices.filter(i => S.chores[i] !== last.chore);
   }
+  if (avoid && choices.length > 1) choices = choices.filter(i => S.chores[i] !== avoid);
+  if (!choices.length) choices = S.chores.map((_, i) => i);
   const r = new Uint32Array(1); crypto.getRandomValues(r);
   return choices[r[0] % choices.length];
 }
-function spin() {
+function spin(swap) {
+  swap = swap === true ? swap : null;
   if (spinning) return;
   if (!S.chores.length) { openParent(); return; }
   if (ac && ac.state === 'suspended') ac.resume();
   spinning = true; $('spin').disabled = true; $('result').hidden = true;
   $('hint').textContent = 'Spinning...';
-  const n = S.chores.length, seg = 360 / n, i = pick();
+  const n = S.chores.length, seg = 360 / n, i = pick(swap && current ? current.chore : null);
   const jitter = (Math.random() - .5) * seg * .7;
   const target = 360 - (i + .5) * seg + jitter;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -257,15 +272,16 @@ function spin() {
   // ticking that slows with the wheel
   let t = 0; const ticks = reduce ? [] : Array.from({length: 26}, (_, k) => 4400 * (1 - Math.pow(1 - (k + 1) / 27, 0.42)));
   ticks.forEach(ms => setTimeout(tick, ms));
-  setTimeout(() => land(i), reduce ? 300 : 4700);
+  setTimeout(() => land(i, !!swap), reduce ? 300 : 4700);
 }
-function land(i) {
+function land(i, swapped) {
   spinning = false; $('spin').disabled = false;
-  current = { kid, chore: S.chores[i], time: new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}), done: false };
+  current = { kid, chore: S.chores[i], time: new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}), done: false, swapped };
   S.log.unshift(current); S.log = S.log.slice(0, 30); save();
   $('resLab').textContent = kid ? `${kid}, your chore is` : 'Your chore is';
   $('resChore').textContent = current.chore;
-  $('resBtns').hidden = false; $('doneMsg').hidden = true; $('result').hidden = false;
+  $('resBtns').hidden = false; $('againBtn').hidden = swapped; $('swapNote').hidden = !swapped;
+  $('doneMsg').hidden = true; $('starRow').hidden = true; $('result').hidden = false;
   if (S.kids.length > 1) {
     kid = S.kids[(S.kids.indexOf(current.kid) + 1) % S.kids.length];
     $('hint').textContent = `${kid}'s turn next!`;
@@ -274,21 +290,28 @@ function land(i) {
   drawLog(); confetti(40);
   $('result').scrollIntoView({behavior:'smooth', block:'nearest'});
 }
-$('spin').addEventListener('click', spin);
-$('wheel').addEventListener('click', spin);
+$('spin').addEventListener('click', () => spin());
+$('wheel').addEventListener('click', () => spin());
 $('againBtn').addEventListener('click', () => {
-  if (current && !current.done) { S.log = S.log.filter(l => l !== current); save(); drawLog(); }
-  if (current) { kid = current.kid; drawKids(); }
-  spin();
+  if (!current || current.swapped || current.done || spinning) return;
+  S.log = S.log.filter(l => l !== current); save(); drawLog();
+  kid = current.kid; drawKids();
+  spin(true);
 });
 $('doneBtn').addEventListener('click', () => {
-  if (!current) return; current.done = true; save(); drawLog();
-  $('resBtns').hidden = true; $('doneMsg').hidden = false; confetti(140);
+  if (!current || current.done) return; current.done = true;
+  const k = current.kid || 'Star'; S.stars[k] = (S.stars[k] || 0) + 1; save(); drawLog(); drawKids();
+  const n = S.stars[k];
+  $('resBtns').hidden = true; $('swapNote').hidden = true;
+  $('doneMsg').textContent = current.kid ? `Nice work, ${current.kid}! That's ${n} star${n === 1 ? '' : 's'}.` : 'Nice work!';
+  $('doneMsg').hidden = false;
+  $('starRow').textContent = n > 20 ? '⭐'.repeat(20) + ' +' + (n - 20) : '⭐'.repeat(n); $('starRow').hidden = false;
+  confetti(140);
 });
 
 function drawLog() {
   $('log').innerHTML = S.log.length ? S.log.map(l =>
-    `<li class="${l.done ? 'ok' : ''}"><span class="c">${l.kid ? esc(l.kid) + ': ' : ''}${esc(l.chore)}</span><span class="t">${esc(l.time)}</span></li>`).join('')
+    `<li class="${l.done ? 'ok' : ''}"><span class="c">${l.kid ? esc(l.kid) + ': ' : ''}${esc(l.chore)}${l.done ? ' ⭐' : ''}</span><span class="t">${esc(l.time)}</span></li>`).join('')
     : '<li class="empty" style="background:none;padding:0">No chores yet today. Spin the wheel!</li>';
 }
 
@@ -311,6 +334,7 @@ function confetti(count) {
 function drawLists() {
   $('kidList').innerHTML = S.kids.map((k, i) => `<div class="item"><input data-t="kids" data-i="${i}" value="${esc(k)}" maxlength="24" aria-label="Kid name"><button class="x" data-t="kids" data-i="${i}" aria-label="Remove ${esc(k)}">×</button></div>`).join('');
   $('choreList').innerHTML = S.chores.map((c, i) => `<div class="item"><span class="sw" style="background:${COLORS[i % COLORS.length]}"></span><input data-t="chores" data-i="${i}" value="${esc(c)}" maxlength="40" aria-label="Chore"><button class="x" data-t="chores" data-i="${i}" aria-label="Remove ${esc(c)}">×</button></div>`).join('');
+  $('starList').innerHTML = S.kids.length ? S.kids.map(k => `<div class="item"><span style="flex:1;font-weight:800;padding:8px 0">${esc(k)}</span><span style="font-weight:800;padding-right:10px">⭐ ${S.stars[k] || 0}</span></div>`).join('') : '<div class="sub">Add a kid first.</div>';
   $('noRepeat').checked = !!S.noRepeat; $('sound').checked = !!S.sound;
 }
 function refresh() { save(); drawWheel(); drawKids(); }
@@ -332,13 +356,18 @@ $('addChore').addEventListener('submit', e => { e.preventDefault(); const v = $(
 $('noRepeat').addEventListener('change', e => { S.noRepeat = e.target.checked; save(); });
 $('sound').addEventListener('change', e => { S.sound = e.target.checked; save(); });
 $('clearLog').addEventListener('click', () => { S.log = []; current = null; $('result').hidden = true; save(); drawLog(); });
-let armed = false;
-$('resetAll').addEventListener('click', e => {
-  if (!armed) { armed = true; e.target.textContent = 'Tap again to confirm'; setTimeout(() => { armed = false; e.target.textContent = 'Reset to starter chores'; }, 3000); return; }
-  armed = false; e.target.textContent = 'Reset to starter chores';
-  S = Object.assign(JSON.parse(JSON.stringify(STARTER)), { day: today() }); current = null; $('result').hidden = true;
+function confirmBtn(id, fn) {
+  const b = $(id), label = b.textContent; let armed = false, t;
+  b.addEventListener('click', () => {
+    if (!armed) { armed = true; b.textContent = 'Tap again to confirm'; t = setTimeout(() => { armed = false; b.textContent = label; }, 3000); return; }
+    clearTimeout(t); armed = false; b.textContent = label; fn();
+  });
+}
+confirmBtn('resetAll', () => {
+  S = Object.assign(JSON.parse(JSON.stringify(STARTER)), { day: today(), stars: S.stars }); current = null; $('result').hidden = true;
   refresh(); drawLists(); drawLog();
 });
+confirmBtn('resetStars', () => { S.stars = {}; save(); drawKids(); drawLists(); });
 
 drawWheel(); drawKids(); drawLog();
 }

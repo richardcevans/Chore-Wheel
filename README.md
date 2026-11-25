@@ -6,10 +6,11 @@ A spinning chore wheel for the kids. Pick who's spinning, tap the wheel, and it 
 
 - Big, tappable wheel with a pointer, clicky sound and confetti when it lands
 - Takes turns: after each spin it switches to the next kid automatically (tap a name to pick someone else)
-- **I did it!** marks the chore done; **Swap my chore** re-spins for the same kid
+- **I did it!** marks the chore done and earns a star; star counts show on each kid's button
+- **Swap my chore** re-spins for the same kid, once per turn (the swapped chore is final)
 - Today list of who got what and what's finished (clears itself each new day)
 - No-repeat option so a kid doesn't get the same chore twice in a row
-- Parent settings (gear button): add, rename and remove kids and chores, toggle sound, reset to starter chores
+- Parent settings (gear button): add, rename and remove kids and chores, see and reset stars, toggle sound, reset to starter chores
 - Saved on the device (browser storage), no account or server
 - Installable phone app (PWA), works offline after the first load
 
