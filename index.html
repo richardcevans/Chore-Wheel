@@ -120,7 +120,7 @@ h1 span { color:var(--sun); }
     <div class="chore" id="resChore"></div>
     <div class="row" id="resBtns">
       <button class="btn go" id="doneBtn">I did it!</button>
-      <button class="btn alt" id="againBtn">Spin again</button>
+      <button class="btn alt" id="againBtn">Swap my chore</button>
     </div>
     <div class="done-msg" id="doneMsg" hidden>Nice work! ⭐</div>
   </section>
@@ -168,8 +168,8 @@ h1 span { color:var(--sun); }
 const KEY = 'chore-wheel-v1';
 const COLORS = ['#ff5d73','#ffa630','#ffd23f','#3ecf8e','#2ec4f1','#7b6cff','#f06bd0','#9be15d'];
 const STARTER = {
-  kids: ['Kid 1', 'Kid 2'],
-  chores: ['Feed the pet','Unload dishwasher','Set the table','Wipe the table','Take out trash','Tidy your room','Fold laundry','Water the plants','Sweep the kitchen','Clean bathroom sink'],
+  kids: ['Allie', 'Andy'],
+  chores: ['Gather trash from rooms','Wipe the table','Take recycling/trash to curb','Tidy your room','Fill cat water & feeders','Sweep the kitchen','Fill dog water & feeder','Clean the bathroom'],
   noRepeat: true, sound: true, log: [], day: ''
 };
 const $ = id => document.getElementById(id);
@@ -180,7 +180,7 @@ let S;
 try { S = JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { S = null; }
 if (!S || !Array.isArray(S.chores)) S = JSON.parse(JSON.stringify(STARTER));
 if (S.day !== today()) { S.log = []; S.day = today(); }
-let kid = S.kids[0] || '';
+let kid = S.kids.includes(S.next) ? S.next : (S.kids[0] || '');
 let rot = 0, spinning = false, current = null;
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 
@@ -190,7 +190,7 @@ function drawWheel() {
   if (!n) { w.innerHTML = '<circle r="196" fill="#3a2f80"/><text y="70" text-anchor="middle" fill="#fff" font-size="20" font-weight="800">Add chores in ⚙</text>'; return; }
   const seg = 360 / n, R = 192;
   const base = n <= 6 ? 21 : n <= 10 ? 17 : n <= 14 ? 14 : 12;
-  const room = R - 14 - 56; // from rim to just outside the hub
+  const room = R - 14 - 50; // from rim to just outside the hub
   let g = '<circle r="200" fill="#fff"/>';
   S.chores.forEach((c, i) => {
     const a0 = (i * seg - 90) * Math.PI / 180, a1 = ((i + 1) * seg - 90) * Math.PI / 180;
@@ -199,8 +199,8 @@ function drawWheel() {
     const path = n === 1 ? `<circle r="${R}" fill="${col}"/>` :
       `<path d="M0 0 L${R*Math.cos(a0)} ${R*Math.sin(a0)} A${R} ${R} 0 ${large} 1 ${R*Math.cos(a1)} ${R*Math.sin(a1)} Z" fill="${col}" stroke="#fff" stroke-width="3"/>`;
     const mid = i * seg + seg / 2 - 90;
-    let fs = Math.max(10, Math.min(base, room / (c.length * 0.56)));
-    const fit = Math.floor(room / (fs * 0.56));
+    let fs = Math.max(10, Math.min(base, room / (c.length * 0.52)));
+    const fit = Math.floor(room / (fs * 0.52));
     const label = c.length > fit ? c.slice(0, fit - 1) + '…' : c;
     const dark = ['#ffd23f','#9be15d','#ffa630','#3ecf8e','#2ec4f1'].includes(col);
     g += path + `<text transform="rotate(${mid}) translate(${R - 14} 0)" text-anchor="end" dominant-baseline="central" font-family="Nunito,sans-serif" font-weight="800" font-size="${fs}" fill="${dark ? '#1b1446' : '#fff'}">${esc(label)}</text>`;
@@ -217,7 +217,7 @@ function drawKids() {
 }
 $('kids').addEventListener('click', e => {
   const b = e.target.closest('.kid'); if (!b || spinning) return;
-  kid = b.dataset.k; drawKids(); $('result').hidden = true; $('hint').textContent = 'Tap the wheel to spin!';
+  kid = b.dataset.k; S.next = kid; save(); drawKids(); $('result').hidden = true; $('hint').textContent = `${kid}, tap the wheel to spin!`;
 });
 
 /* ---------- spin ---------- */
@@ -266,7 +266,11 @@ function land(i) {
   $('resLab').textContent = kid ? `${kid}, your chore is` : 'Your chore is';
   $('resChore').textContent = current.chore;
   $('resBtns').hidden = false; $('doneMsg').hidden = true; $('result').hidden = false;
-  $('hint').textContent = '';
+  if (S.kids.length > 1) {
+    kid = S.kids[(S.kids.indexOf(current.kid) + 1) % S.kids.length];
+    $('hint').textContent = `${kid}'s turn next!`;
+  } else $('hint').textContent = '';
+  S.next = kid; save(); drawKids();
   drawLog(); confetti(40);
   $('result').scrollIntoView({behavior:'smooth', block:'nearest'});
 }
@@ -274,6 +278,7 @@ $('spin').addEventListener('click', spin);
 $('wheel').addEventListener('click', spin);
 $('againBtn').addEventListener('click', () => {
   if (current && !current.done) { S.log = S.log.filter(l => l !== current); save(); drawLog(); }
+  if (current) { kid = current.kid; drawKids(); }
   spin();
 });
 $('doneBtn').addEventListener('click', () => {
