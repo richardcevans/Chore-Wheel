@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Chore Wheel</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1b1446">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#1b1446; --bg2:#2a1f66; --surface:#fff8ec; --ink:#1b1446; --ink-soft:#5b5390;
+  --sun:#ffc93c; --line:#e8dcc6; --white:#ffffff;
+  --s1:#ff5d73; --s2:#ffa630; --s3:#ffd23f; --s4:#3ecf8e; --s5:#2ec4f1; --s6:#7b6cff; --s7:#f06bd0; --s8:#9be15d;
+}
+* { box-sizing:border-box; margin:0; padding:0; min-width:0; }
+html { -webkit-text-size-adjust:100%; overflow-x:hidden; }
+body {
+  font-family:'Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:radial-gradient(900px 520px at 50% -8%, var(--bg2) 0%, var(--bg) 62%) fixed, var(--bg);
+  color:var(--white); min-height:100vh; overflow-x:clip;
+  padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 40px max(16px,env(safe-area-inset-left));
+  display:flex; flex-direction:column; align-items:center;
+}
+button, input { font-family:inherit; }
+button { cursor:pointer; }
+.wrap { width:100%; max-width:560px; display:flex; flex-direction:column; align-items:center; gap:16px; }
+header { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+h1 { font-family:'Baloo 2','Nunito',sans-serif; font-weight:800; font-size:clamp(2rem,8vw,2.6rem); line-height:1; letter-spacing:-.01em; }
+h1 span { color:var(--sun); }
+.gear { width:44px; height:44px; border-radius:14px; border:2px solid rgba(255,255,255,.25); background:rgba(255,255,255,.08); color:#fff; font-size:1.3rem; display:grid; place-items:center; }
+.gear:hover { background:rgba(255,255,255,.16); }
+
+.who { width:100%; text-align:center; }
+.who .q { font-weight:800; font-size:1rem; color:#cfc8ff; margin-bottom:8px; }
+.kids { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
+.kid { min-height:44px; padding:8px 18px; border-radius:99px; border:2px solid rgba(255,255,255,.3); background:transparent; color:#fff; font-weight:800; font-size:1.05rem; }
+.kid.on { background:var(--sun); border-color:var(--sun); color:var(--ink); }
+
+.stage { position:relative; width:min(100%,440px); aspect-ratio:1; }
+.stage svg.wheel { width:100%; height:100%; display:block; transition:transform 4.6s cubic-bezier(.12,.62,.08,1); filter:drop-shadow(0 18px 34px rgba(0,0,0,.45)); }
+.stage .pointer { position:absolute; left:50%; top:-6px; transform:translateX(-50%); width:44px; height:54px; z-index:2; filter:drop-shadow(0 4px 6px rgba(0,0,0,.4)); }
+.hub { position:absolute; left:50%; top:50%; width:23%; aspect-ratio:1; transform:translate(-50%,-50%); border-radius:50%; border:6px solid #fff; background:var(--sun); color:var(--ink);
+  font-family:'Baloo 2',sans-serif; font-weight:800; font-size:clamp(1.1rem,5vw,1.6rem); line-height:1; box-shadow:0 6px 0 #d99a10, 0 10px 20px rgba(0,0,0,.35); z-index:3; }
+.hub:active { transform:translate(-50%,-46%); box-shadow:0 2px 0 #d99a10; }
+.hub:disabled { cursor:default; filter:saturate(.6); }
+.hub:focus-visible, .kid:focus-visible, .btn:focus-visible { outline:3px solid #fff; outline-offset:3px; }
+.hint { color:#cfc8ff; font-weight:700; font-size:.95rem; text-align:center; min-height:1.4em; }
+
+.result { width:100%; background:var(--surface); color:var(--ink); border-radius:24px; padding:20px 22px; text-align:center; box-shadow:0 14px 40px rgba(0,0,0,.35); }
+.result .lab { color:var(--ink-soft); font-weight:800; font-size:1rem; }
+.result .chore { font-family:'Baloo 2',sans-serif; font-weight:800; font-size:clamp(1.8rem,8vw,2.4rem); line-height:1.05; margin:6px 0 14px; overflow-wrap:anywhere; }
+.row { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+.btn { min-height:48px; padding:10px 20px; border-radius:16px; border:0; font-weight:800; font-size:1rem; }
+.btn.go { background:var(--s4); color:#08311f; box-shadow:0 4px 0 #23945f; }
+.btn.alt { background:#eee4ff; color:var(--ink); }
+.btn.go:active { transform:translateY(3px); box-shadow:0 1px 0 #23945f; }
+.done-msg { font-weight:800; color:#23945f; font-size:1.1rem; }
+
+.log { width:100%; }
+.log h2, .panel h2 { font-family:'Baloo 2',sans-serif; font-weight:800; font-size:1.3rem; margin-bottom:8px; }
+.log ul { list-style:none; display:flex; flex-direction:column; gap:6px; }
+.log li { display:flex; justify-content:space-between; gap:10px; background:rgba(255,255,255,.07); border-radius:12px; padding:9px 14px; font-weight:700; }
+.log li .t { color:#cfc8ff; white-space:nowrap; font-size:.9rem; }
+.log li.ok .c::before { content:'✓ '; color:var(--s4); }
+.log .empty { color:#cfc8ff; font-weight:700; }
+
+/* parent panel */
+.veil { position:fixed; inset:0; background:rgba(10,6,30,.6); z-index:10; display:flex; justify-content:center; align-items:flex-end; }
+.panel { width:100%; max-width:560px; max-height:92vh; overflow:auto; background:var(--surface); color:var(--ink); border-radius:24px 24px 0 0;
+  padding:20px max(18px,env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left)); }
+@media (min-width:620px){ .veil { align-items:center; } .panel { border-radius:24px; } }
+.panel .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.panel .sec { margin-top:16px; }
+.panel .sub { color:var(--ink-soft); font-size:.92rem; font-weight:700; margin-bottom:8px; }
+.list { display:flex; flex-direction:column; gap:6px; }
+.item { display:flex; align-items:center; gap:8px; background:#fff; border:2px solid var(--line); border-radius:14px; padding:6px 6px 6px 12px; }
+.item .sw { width:14px; height:14px; border-radius:50%; flex:none; }
+.item input { flex:1; border:0; background:transparent; font-size:16px; font-weight:700; color:var(--ink); padding:6px 0; }
+.item input:focus { outline:none; }
+.item:focus-within { border-color:var(--s6); }
+.x { width:40px; height:40px; border-radius:10px; border:0; background:#ffe3e7; color:#b3263b; font-size:1.2rem; font-weight:800; flex:none; }
+.add { display:flex; gap:8px; margin-top:8px; }
+.add input { flex:1; font-size:16px; font-weight:700; border:2px solid var(--line); border-radius:14px; padding:10px 12px; color:var(--ink); background:#fff; }
+.add input:focus { outline:none; border-color:var(--s6); }
+.add .btn { background:var(--s6); color:#fff; }
+.toggle { display:flex; align-items:center; gap:10px; font-weight:700; }
+.toggle input { width:22px; height:22px; accent-color:var(--s6); }
+.btn.reset { background:transparent; color:#b3263b; border:2px solid #ffc7cf; }
+.note { color:var(--ink-soft); font-size:.85rem; margin-top:14px; }
+[hidden] { display:none !important; }
+@media (prefers-reduced-motion:reduce){ .stage svg.wheel { transition-duration:.01s; } }
+.confetti { position:fixed; inset:0; pointer-events:none; z-index:20; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Chore <span>Wheel</span></h1>
+    <button class="gear" id="openParent" aria-label="Parent settings" title="Parent settings">⚙</button>
+  </header>
+
+  <section class="who" id="whoBox">
+    <div class="q">Who's spinning?</div>
+    <div class="kids" id="kids"></div>
+  </section>
+
+  <div class="stage">
+    <svg class="pointer" viewBox="0 0 44 54" aria-hidden="true"><path d="M22 52 L4 14 A18 18 0 1 1 40 14 Z" fill="#fff"/><circle cx="22" cy="18" r="8" fill="#ff5d73"/></svg>
+    <svg class="wheel" id="wheel" viewBox="-200 -200 400 400" role="img" aria-label="Chore wheel"></svg>
+    <button class="hub" id="spin">SPIN</button>
+  </div>
+  <div class="hint" id="hint">Tap the wheel to spin!</div>
+
+  <section class="result" id="result" hidden aria-live="polite">
+    <div class="lab" id="resLab">Your chore is</div>
+    <div class="chore" id="resChore"></div>
+    <div class="row" id="resBtns">
+      <button class="btn go" id="doneBtn">I did it!</button>
+      <button class="btn alt" id="againBtn">Spin again</button>
+    </div>
+    <div class="done-msg" id="doneMsg" hidden>Nice work! ⭐</div>
+  </section>
+
+  <section class="log">
+    <h2>Today</h2>
+    <ul id="log"></ul>
+  </section>
+</div>
+
+<div class="veil" id="veil" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="pTitle">
+    <div class="top"><h2 id="pTitle">Parent settings</h2><button class="btn alt" id="closeParent">Done</button></div>
+
+    <div class="sec">
+      <div class="sub">Kids</div>
+      <div class="list" id="kidList"></div>
+      <form class="add" id="addKid"><input id="newKid" placeholder="Add a kid's name" maxlength="24" autocomplete="off"><button class="btn">Add</button></form>
+    </div>
+
+    <div class="sec">
+      <div class="sub">Chores on the wheel</div>
+      <div class="list" id="choreList"></div>
+      <form class="add" id="addChore"><input id="newChore" placeholder="Add a chore" maxlength="40" autocomplete="off"><button class="btn">Add</button></form>
+    </div>
+
+    <div class="sec">
+      <label class="toggle"><input type="checkbox" id="noRepeat"> Don't give the same kid the same chore twice in a row</label>
+    </div>
+    <div class="sec">
+      <label class="toggle"><input type="checkbox" id="sound"> Clicky spin sound</label>
+    </div>
+
+    <div class="sec row" style="justify-content:flex-start">
+      <button class="btn reset" id="clearLog">Clear today's list</button>
+      <button class="btn reset" id="resetAll">Reset to starter chores</button>
+    </div>
+    <p class="note">Saved on this device only. The starter chores and names are examples, so change them to fit your house.</p>
+  </div>
+</div>
+<canvas class="confetti" id="confetti"></canvas>
+
+<script>
+{
+const KEY = 'chore-wheel-v1';
+const COLORS = ['#ff5d73','#ffa630','#ffd23f','#3ecf8e','#2ec4f1','#7b6cff','#f06bd0','#9be15d'];
+const STARTER = {
+  kids: ['Kid 1', 'Kid 2'],
+  chores: ['Feed the pet','Unload dishwasher','Set the table','Wipe the table','Take out trash','Tidy your room','Fold laundry','Water the plants','Sweep the kitchen','Clean bathroom sink'],
+  noRepeat: true, sound: true, log: [], day: ''
+};
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today = () => new Date().toDateString();
+
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { S = null; }
+if (!S || !Array.isArray(S.chores)) S = JSON.parse(JSON.stringify(STARTER));
+if (S.day !== today()) { S.log = []; S.day = today(); }
+let kid = S.kids[0] || '';
+let rot = 0, spinning = false, current = null;
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+
+/* ---------- wheel ---------- */
+function drawWheel() {
+  const w = $('wheel'), n = S.chores.length;
+  if (!n) { w.innerHTML = '<circle r="196" fill="#3a2f80"/><text y="70" text-anchor="middle" fill="#fff" font-size="20" font-weight="800">Add chores in ⚙</text>'; return; }
+  const seg = 360 / n, R = 192;
+  const base = n <= 6 ? 21 : n <= 10 ? 17 : n <= 14 ? 14 : 12;
+  const room = R - 14 - 56; // from rim to just outside the hub
+  let g = '<circle r="200" fill="#fff"/>';
+  S.chores.forEach((c, i) => {
+    const a0 = (i * seg - 90) * Math.PI / 180, a1 = ((i + 1) * seg - 90) * Math.PI / 180;
+    const col = COLORS[i % COLORS.length === 0 && i === n - 1 && n > 1 ? 1 : i % COLORS.length];
+    const large = seg > 180 ? 1 : 0;
+    const path = n === 1 ? `<circle r="${R}" fill="${col}"/>` :
+      `<path d="M0 0 L${R*Math.cos(a0)} ${R*Math.sin(a0)} A${R} ${R} 0 ${large} 1 ${R*Math.cos(a1)} ${R*Math.sin(a1)} Z" fill="${col}" stroke="#fff" stroke-width="3"/>`;
+    const mid = i * seg + seg / 2 - 90;
+    let fs = Math.max(10, Math.min(base, room / (c.length * 0.56)));
+    const fit = Math.floor(room / (fs * 0.56));
+    const label = c.length > fit ? c.slice(0, fit - 1) + '…' : c;
+    const dark = ['#ffd23f','#9be15d','#ffa630','#3ecf8e','#2ec4f1'].includes(col);
+    g += path + `<text transform="rotate(${mid}) translate(${R - 14} 0)" text-anchor="end" dominant-baseline="central" font-family="Nunito,sans-serif" font-weight="800" font-size="${fs}" fill="${dark ? '#1b1446' : '#fff'}">${esc(label)}</text>`;
+  });
+  for (let i = 0; i < n; i++) { const a = (i * seg - 90) * Math.PI / 180; g += `<circle cx="${196*Math.cos(a)}" cy="${196*Math.sin(a)}" r="3.5" fill="#ffd23f"/>`; }
+  w.innerHTML = g;
+}
+
+/* ---------- kids ---------- */
+function drawKids() {
+  $('whoBox').hidden = S.kids.length === 0;
+  if (!S.kids.includes(kid)) kid = S.kids[0] || '';
+  $('kids').innerHTML = S.kids.map(k => `<button class="kid${k === kid ? ' on' : ''}" data-k="${esc(k)}">${esc(k)}</button>`).join('');
+}
+$('kids').addEventListener('click', e => {
+  const b = e.target.closest('.kid'); if (!b || spinning) return;
+  kid = b.dataset.k; drawKids(); $('result').hidden = true; $('hint').textContent = 'Tap the wheel to spin!';
+});
+
+/* ---------- spin ---------- */
+let ac = null;
+function tick() {
+  if (!S.sound) return;
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'square'; o.frequency.value = 1400; g.gain.setValueAtTime(.05, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + .03);
+    o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime + .04);
+  } catch (e) {}
+}
+function pick() {
+  const n = S.chores.length;
+  let choices = S.chores.map((_, i) => i);
+  if (S.noRepeat && n > 1) {
+    const last = S.log.find(l => l.kid === kid);
+    if (last) choices = choices.filter(i => S.chores[i] !== last.chore);
+  }
+  const r = new Uint32Array(1); crypto.getRandomValues(r);
+  return choices[r[0] % choices.length];
+}
+function spin() {
+  if (spinning) return;
+  if (!S.chores.length) { openParent(); return; }
+  if (ac && ac.state === 'suspended') ac.resume();
+  spinning = true; $('spin').disabled = true; $('result').hidden = true;
+  $('hint').textContent = 'Spinning...';
+  const n = S.chores.length, seg = 360 / n, i = pick();
+  const jitter = (Math.random() - .5) * seg * .7;
+  const target = 360 - (i + .5) * seg + jitter;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  rot = rot - (rot % 360) + 360 * (reduce ? 1 : 6) + ((target % 360) + 360) % 360;
+  $('wheel').style.transform = `rotate(${rot}deg)`;
+  // ticking that slows with the wheel
+  let t = 0; const ticks = reduce ? [] : Array.from({length: 26}, (_, k) => 4400 * (1 - Math.pow(1 - (k + 1) / 27, 0.42)));
+  ticks.forEach(ms => setTimeout(tick, ms));
+  setTimeout(() => land(i), reduce ? 300 : 4700);
+}
+function land(i) {
+  spinning = false; $('spin').disabled = false;
+  current = { kid, chore: S.chores[i], time: new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}), done: false };
+  S.log.unshift(current); S.log = S.log.slice(0, 30); save();
+  $('resLab').textContent = kid ? `${kid}, your chore is` : 'Your chore is';
+  $('resChore').textContent = current.chore;
+  $('resBtns').hidden = false; $('doneMsg').hidden = true; $('result').hidden = false;
+  $('hint').textContent = '';
+  drawLog(); confetti(40);
+  $('result').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+$('spin').addEventListener('click', spin);
+$('wheel').addEventListener('click', spin);
+$('againBtn').addEventListener('click', () => {
+  if (current && !current.done) { S.log = S.log.filter(l => l !== current); save(); drawLog(); }
+  spin();
+});
+$('doneBtn').addEventListener('click', () => {
+  if (!current) return; current.done = true; save(); drawLog();
+  $('resBtns').hidden = true; $('doneMsg').hidden = false; confetti(140);
+});
+
+function drawLog() {
+  $('log').innerHTML = S.log.length ? S.log.map(l =>
+    `<li class="${l.done ? 'ok' : ''}"><span class="c">${l.kid ? esc(l.kid) + ': ' : ''}${esc(l.chore)}</span><span class="t">${esc(l.time)}</span></li>`).join('')
+    : '<li class="empty" style="background:none;padding:0">No chores yet today. Spin the wheel!</li>';
+}
+
+/* ---------- confetti ---------- */
+function confetti(count) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cv = $('confetti'), cx = cv.getContext('2d');
+  cv.width = innerWidth; cv.height = innerHeight;
+  const ps = Array.from({length: count}, () => ({ x: innerWidth / 2, y: innerHeight * .45, vx: (Math.random() - .5) * 14, vy: -Math.random() * 14 - 4,
+    s: 5 + Math.random() * 6, c: COLORS[Math.floor(Math.random() * COLORS.length)], r: Math.random() * 6 }));
+  let f = 0;
+  (function step() {
+    cx.clearRect(0, 0, cv.width, cv.height);
+    ps.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += .45; p.r += .2; cx.save(); cx.translate(p.x, p.y); cx.rotate(p.r); cx.fillStyle = p.c; cx.fillRect(-p.s/2, -p.s/4, p.s, p.s/2); cx.restore(); });
+    if (++f < 90) requestAnimationFrame(step); else cx.clearRect(0, 0, cv.width, cv.height);
+  })();
+}
+
+/* ---------- parent panel ---------- */
+function drawLists() {
+  $('kidList').innerHTML = S.kids.map((k, i) => `<div class="item"><input data-t="kids" data-i="${i}" value="${esc(k)}" maxlength="24" aria-label="Kid name"><button class="x" data-t="kids" data-i="${i}" aria-label="Remove ${esc(k)}">×</button></div>`).join('');
+  $('choreList').innerHTML = S.chores.map((c, i) => `<div class="item"><span class="sw" style="background:${COLORS[i % COLORS.length]}"></span><input data-t="chores" data-i="${i}" value="${esc(c)}" maxlength="40" aria-label="Chore"><button class="x" data-t="chores" data-i="${i}" aria-label="Remove ${esc(c)}">×</button></div>`).join('');
+  $('noRepeat').checked = !!S.noRepeat; $('sound').checked = !!S.sound;
+}
+function refresh() { save(); drawWheel(); drawKids(); }
+function openParent() { drawLists(); $('veil').hidden = false; }
+$('openParent').addEventListener('click', openParent);
+$('closeParent').addEventListener('click', () => { $('veil').hidden = true; refresh(); });
+$('veil').addEventListener('click', e => { if (e.target === $('veil')) { $('veil').hidden = true; refresh(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('veil').hidden) { $('veil').hidden = true; refresh(); } });
+document.querySelector('.panel').addEventListener('input', e => {
+  const t = e.target; if (!t.dataset.t) return;
+  const v = t.value.trim(); if (v) { S[t.dataset.t][+t.dataset.i] = v; refresh(); }
+});
+document.querySelector('.panel').addEventListener('click', e => {
+  const b = e.target.closest('.x'); if (!b) return;
+  S[b.dataset.t].splice(+b.dataset.i, 1); refresh(); drawLists();
+});
+$('addKid').addEventListener('submit', e => { e.preventDefault(); const v = $('newKid').value.trim(); if (v && !S.kids.includes(v)) { S.kids.push(v); $('newKid').value = ''; refresh(); drawLists(); } });
+$('addChore').addEventListener('submit', e => { e.preventDefault(); const v = $('newChore').value.trim(); if (v) { S.chores.push(v); $('newChore').value = ''; refresh(); drawLists(); } });
+$('noRepeat').addEventListener('change', e => { S.noRepeat = e.target.checked; save(); });
+$('sound').addEventListener('change', e => { S.sound = e.target.checked; save(); });
+$('clearLog').addEventListener('click', () => { S.log = []; current = null; $('result').hidden = true; save(); drawLog(); });
+let armed = false;
+$('resetAll').addEventListener('click', e => {
+  if (!armed) { armed = true; e.target.textContent = 'Tap again to confirm'; setTimeout(() => { armed = false; e.target.textContent = 'Reset to starter chores'; }, 3000); return; }
+  armed = false; e.target.textContent = 'Reset to starter chores';
+  S = Object.assign(JSON.parse(JSON.stringify(STARTER)), { day: today() }); current = null; $('result').hidden = true;
+  refresh(); drawLists(); drawLog();
+});
+
+drawWheel(); drawKids(); drawLog();
+}
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
